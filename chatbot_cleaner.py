@@ -8,21 +8,14 @@ Fully testable in Google Colab with GPU support
 # SECTION 1: DEPENDENCIES AND INSTALLATION
 # ============================================================================
 
-# Install required packages
 print("Installing dependencies...")
 import subprocess
 import sys
 
 def install_packages():
     packages = [
-        'torch',
-        'transformers',
-        'accelerate',
-        'bitsandbytes',
-        'sentence-transformers',
-        'faiss-cpu',
-        'pyyaml',
-        'httpx'
+        'torch', 'transformers', 'accelerate', 'bitsandbytes',
+        'sentence-transformers', 'faiss-cpu', 'pyyaml', 'httpx'
     ]
     for package in packages:
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', package])
@@ -39,8 +32,7 @@ import yaml
 import torch
 import faiss
 import numpy as np
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
@@ -65,7 +57,7 @@ system_role: |
 behavior_rules:
   - Always be respectful and professional
   - Use retrieved context to ground your answers but speak naturally
-  - When referencing policies, do so naturally (e.g., "According to our school policy..." or "Our attendance requirements state...")
+  - When referencing policies, do so naturally
   - If you don't have enough information, politely say so as a human would
   - Never make up information
   - Stay within school-related topics
@@ -119,17 +111,15 @@ response_template: |
   - Do NOT list policy numbers or citations
   - Speak as if you naturally know this information from working at the school
   - Be warm, helpful, and human-like
-  - If citing a policy, do it naturally (e.g., "Our school policy requires..." or "According to our guidelines...")
   - Keep your response concise and friendly (2-4 sentences for simple queries)
 
   Your response:
 """
 
 # ============================================================================
-# SECTION 3: MOCK DATA STRUCTURES
+# SECTION 3: MOCK DATA (kept for schedule/materials - not used for grades/attendance)
 # ============================================================================
 
-# TODO: Replace this with Laravel DB or API call
 MOCK_USERS = {
     "user001": {"userId": "user001", "name": "Alice Johnson", "role": "student", "grade": "11", "section": "A", "year": "2025"},
     "user002": {"userId": "user002", "name": "Bob Smith", "role": "teacher", "grade": None},
@@ -137,69 +127,18 @@ MOCK_USERS = {
     "user004": {"userId": "user004", "name": "David Brown", "role": "admin", "grade": None},
 }
 
-
-# TODO: Replace this with Laravel DB or API call
-MOCK_GRADES = {
-    "user001": [
-        {"subject": "Mathematics", "grade": "A", "score": 92, "semester": "Fall 2024"},
-        {"subject": "English", "grade": "B+", "score": 87, "semester": "Fall 2024"},
-        {"subject": "Physics", "grade": "A-", "score": 90, "semester": "Fall 2024"},
-        {"subject": "History", "grade": "B", "score": 85, "semester": "Fall 2024"},
-    ]
-}
-
-# TODO: Replace this with Laravel DB or API call
-MOCK_ATTENDANCE = {
-    "user001": {
-        "total_days": 120,
-        "present": 112,
-        "absent": 8,
-        "percentage": 93.3,
-        "recent_absences": ["2024-11-15", "2024-11-22", "2024-12-03"]
-    }
-}
-
-# TODO: Replace this with Laravel DB or API call
-MOCK_PAYMENTS = {
-    "user003": [
-        {"description": "Tuition Fee - Fall 2024", "amount": 5000, "status": "Paid", "due_date": "2024-09-01"},
-        {"description": "Lab Fee", "amount": 200, "status": "Paid", "due_date": "2024-09-15"},
-        {"description": "Tuition Fee - Spring 2025", "amount": 5000, "status": "Pending", "due_date": "2025-01-15"},
-    ]
-}
-
-# TODO: Replace this with Laravel DB or API call
-MOCK_LEARNING_MATERIALS = [
-    {"id": "mat001", "title": "Algebra Basics", "subject": "Mathematics", "type": "pdf"},
-    {"id": "mat002", "title": "Shakespeare Guide", "subject": "English", "type": "video"},
-    {"id": "mat003", "title": "Physics Lab Manual", "subject": "Physics", "type": "pdf"},
-]
-
-
-# =========================
-# MOCK MATERIALS BY GRADE & YEAR
-# =========================
-
 MOCK_MATERIALS_BY_GRADE_YEAR = {
     ("1", "2015"): ["French", "English", "Math"],
     ("10", "2024"): ["Mathematics", "Physics", "English", "History"],
     ("11", "2025"): ["Mathematics", "Physics", "Chemistry", "English", "Philosophy"],
 }
 
-# =========================
-# MOCK STUDENT CURRENT MATERIALS
-# =========================
-
 MOCK_STUDENT_MATERIALS = {
-    "user001": {  # Alice Johnson
+    "user001": {
         "year": "2025",
         "materials": ["Mathematics", "Physics", "English", "History"]
     }
 }
-
-# =========================
-# MOCK SCHEDULES BY (GRADE, SECTION, YEAR)
-# =========================
 
 MOCK_SCHEDULES = {
     ("11", "A", "2025"): {
@@ -218,9 +157,8 @@ MOCK_SCHEDULES = {
     }
 }
 
-
 # ============================================================================
-# SECTION 4: POLICY DATABASE (GROUND TRUTH)
+# SECTION 4: POLICY DATABASE
 # ============================================================================
 
 POLICIES = [
@@ -270,7 +208,7 @@ POLICIES = [
         "id": "6.1",
         "question": "Who is the director of the school",
         "answer": "Charbel Chamoun is the director of the school. He is 19 years old. He is born in 16 August 2007.",
-        "category": "dress_code",
+        "category": "info",
         "lastUpdated": "2024-09-01"
     }
 ]
@@ -280,8 +218,10 @@ POLICIES = [
 # ============================================================================
 
 class PermissionError(Exception):
-    """Custom exception for permission violations"""
     pass
+
+# NOTE: getGrades and getAttendance use LARAVEL_API_URL which is defined later.
+# They are called only after LARAVEL_API_URL is set.
 
 async def getGrades(token: str, role: str) -> Dict[str, Any]:
     if role not in ["student", "teacher", "admin"]:
@@ -289,14 +229,17 @@ async def getGrades(token: str, role: str) -> Dict[str, Any]:
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            "http://127.0.0.1:8000/api/grades/my",
-            headers={"Authorization": f"Bearer {token}",
-                     "ngrok-skip-browser-warning": "true"
-                     }
+            f"{LARAVEL_API_URL}/api/grades/my",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "ngrok-skip-browser-warning": "true"
+            }
         )
 
+    print(f"[DEBUG] getGrades status: {resp.status_code}")
+
     if resp.status_code != 200:
-        return {"success": False, "message": "Could not fetch grades from server"}
+        return {"success": False, "message": f"Could not fetch grades from server (status {resp.status_code})"}
 
     raw = resp.json()
     grades = [
@@ -309,7 +252,9 @@ async def getGrades(token: str, role: str) -> Dict[str, Any]:
         }
         for item in raw
     ]
+    print(f"[DEBUG] getGrades parsed {len(grades)} grades")
     return {"success": True, "grades": grades}
+
 
 async def getAttendance(token: str, role: str) -> Dict[str, Any]:
     if role not in ["student", "teacher", "admin"]:
@@ -317,13 +262,100 @@ async def getAttendance(token: str, role: str) -> Dict[str, Any]:
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            "http://127.0.0.1:8000/api/attendance/my",
-            headers={"Authorization": f"Bearer {token}",
-                     "ngrok-skip-browser-warning": "true"}
+            f"{LARAVEL_API_URL}/api/attendance/my",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "ngrok-skip-browser-warning": "true"
+            }
         )
 
+    print(f"[DEBUG] getAttendance status: {resp.status_code}")
+
     if resp.status_code != 200:
-        return {"success": False, "message": "Could not fetch attendance from server"}
+        return {"success": False, "message": f"Could not fetch attendance from server (status {resp.status_code})"}
+
+    raw = resp.json()
+    total = len(raw)
+    present = sum(1 for r in raw if r["status"] == "present")
+    absent = total - present
+    percentage = round((present / total) * 100, 1) if total > 0 else 0
+    recent_absences = [r["date"] for r in raw if r["status"] == "absent"][:5]
+
+    print(f"[DEBUG] getAttendance: total={total}, present={present}, absent={absent}, percentage={percentage}")
+    return {
+        "success": True,
+        "attendance": {
+            "total_days": total,
+            "present": present,
+            "absent": absent,
+            "percentage": percentage,
+            "recent_absences": recent_absences
+        }
+    }
+
+
+
+async def getParentChildren(token: str) -> Dict[str, Any]:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{LARAVEL_API_URL}/api/parent/children",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "ngrok-skip-browser-warning": "true"
+            }
+        )
+    if resp.status_code != 200:
+        return {"success": False, "message": "Could not fetch children"}
+
+    raw = resp.json()
+    children = [
+        {
+            "id": child["id"],
+            "name": child["user"]["name"],
+            "class": child["school_class"]["name"],
+            "section": child["school_class"]["section"],
+        }
+        for child in raw
+    ]
+    return {"success": True, "children": children}
+
+
+async def getGradesForChild(token: str, studentId: int) -> Dict[str, Any]:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{LARAVEL_API_URL}/api/parent/children/{studentId}/grades",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "ngrok-skip-browser-warning": "true"
+            }
+        )
+    if resp.status_code != 200:
+        return {"success": False, "message": "Could not fetch grades"}
+
+    raw = resp.json()
+    grades = [
+        {
+            "subject": item["subject"]["name"],
+            "score": item["score"],
+            "max_score": item["max_score"],
+            "term": item["term"],
+        }
+        for item in raw
+    ]
+    return {"success": True, "grades": grades}
+
+
+async def getAttendanceForChild(token: str, studentId: int) -> Dict[str, Any]:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{LARAVEL_API_URL}/api/parent/children/{studentId}/attendance",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "ngrok-skip-browser-warning": "true"
+            }
+        )
+    if resp.status_code != 200:
+        return {"success": False, "message": "Could not fetch attendance"}
 
     raw = resp.json()
     total = len(raw)
@@ -341,46 +373,12 @@ async def getAttendance(token: str, role: str) -> Dict[str, Any]:
             "percentage": percentage,
             "recent_absences": recent_absences
         }
-    }
-
-def getPayments(userId: str, role: str) -> Dict[str, Any]:
-    """
-    Retrieve payment information with role-based access control
-
-    TODO: Replace with Laravel DB or API call
-
-    Args:
-        userId: The user ID requesting payment info
-        role: The role of the requester (parent, admin)
-
-    Returns:
-        Dictionary containing payment information
-
-    Raises:
-        PermissionError: If user doesn't have permission to view payments
-    """
-    # Check permissions
-    if role not in ["parent", "admin"]:
-        raise PermissionError(f"Role '{role}' is not authorized to view payment information")
-
-    # TODO: Replace with actual database query
-    if userId in MOCK_PAYMENTS:
-        return {
-            "success": True,
-            "userId": userId,
-            "payments": MOCK_PAYMENTS[userId]
-        }
-    else:
-        return {
-            "success": False,
-            "message": "No payment information found for this user"
-        }
+    }    
 
 
 def getStudentMaterials(userId: str, role: str) -> Dict[str, Any]:
     if role != "student":
         raise PermissionError("Only students can view their materials")
-
     if userId in MOCK_STUDENT_MATERIALS:
         return {
             "success": True,
@@ -388,7 +386,6 @@ def getStudentMaterials(userId: str, role: str) -> Dict[str, Any]:
             "year": MOCK_STUDENT_MATERIALS[userId]["year"],
             "materials": MOCK_STUDENT_MATERIALS[userId]["materials"]
         }
-
     return {"success": False, "message": "No materials found for this student"}
 
 
@@ -401,34 +398,42 @@ def getMaterialsByGradeYear(grade: str, year: str) -> Dict[str, Any]:
             "year": year,
             "materials": MOCK_MATERIALS_BY_GRADE_YEAR[key]
         }
-
     return {"success": False, "message": "No materials found for this grade/year"}
 
 
-def getSchedule(grade: str, section: str, year: str, role: str) -> Dict[str, Any]:
+async def getSchedule(token: str, role: str) -> Dict[str, Any]:
     if role not in ["student", "admin", "teacher"]:
         raise PermissionError("You are not allowed to view schedules")
 
-    key = (grade, section, year)
-    if key in MOCK_SCHEDULES:
-        return {
-            "success": True,
-            "grade": grade,
-            "section": section,
-            "year": year,
-            "schedule": MOCK_SCHEDULES[key]
-        }
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{LARAVEL_API_URL}/api/schedule/my",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "ngrok-skip-browser-warning": "true"
+            }
+        )
 
-    return {"success": False, "message": "No schedule found for this class"}
+    print(f"[DEBUG] getSchedule status: {resp.status_code}")
+    if resp.status_code != 200:
+        return {"success": False, "message": "Could not fetch schedule"}
+
+    raw = resp.json()
+    # Convert to simple format: {"Monday": ["Math 08:00-09:30", ...], ...}
+    schedule = {}
+    for day, entries in raw.items():
+        schedule[day] = [
+            f"{e['subject']['name']} ({e['start_time']}-{e['end_time']}, {e['room']})"
+            for e in entries
+        ]
+
+    return {"success": True, "schedule": schedule}
 
 # ============================================================================
 # SECTION 6: HYBRID INTENT CLASSIFIER
 # ============================================================================
 
 class IntentClassifier:
-    """
-    Hybrid intent classifier using keyword matching and LLM fallback
-    """
     INTENT_EXAMPLES = {
         "policy_question": [
             "What is the dress code?",
@@ -469,197 +474,95 @@ class IntentClassifier:
             "Show me my timetable",
             "What classes do I have this week?"
         ],
-
     }
 
-    # Keyword patterns for each intent
     INTENT_KEYWORDS = {
         "policy_question": ["policy", "rule", "regulation", "guideline", "allowed", "permitted", "code of conduct"],
-        "grade_inquiry": ["grade", "score", "marks", "result", "performance", "GPA", "transcript"],
-        "attendance": ["attendance", "absent", "present", "attendance rate", "missing class"],
+        "grade_inquiry": ["grade", "score", "marks", "result", "performance", "gpa", "transcript"],
+        "attendance": ["attendance", "absent", "present", "attendance rate", "missing class", "attendance record"],
         "payment_info": ["payment", "fee", "tuition", "bill", "invoice", "pay", "cost", "price"],
         "complaint": ["complaint", "problem", "issue", "concern", "unhappy", "dissatisfied", "frustrated"],
         "chitchat": ["hello", "hi", "how are you", "good morning", "thanks", "thank you", "bye"],
         "violation": ["hack", "cheat", "steal", "illegal", "bypass", "exploit", "password"],
         "materials": ["material", "subject", "course", "what do we study", "what are my materials"],
         "schedule": ["schedule", "timetable", "my classes", "my periods", "class time"],
-
     }
 
     def __init__(self, llm_classifier=None):
-        """
-        Initialize the intent classifier
-
-        Args:
-            llm_classifier: Optional LLM-based classifier for fallback
-        """
         self.llm_classifier = llm_classifier
-        from sentence_transformers import SentenceTransformer
-
         self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
     def classify_by_semantic_similarity(self, message: str, threshold: float = 0.5) -> Optional[str]:
         message_emb = self.embedder.encode([message])
-
         best_intent = None
         best_score = 0.0
-
         for intent, examples in self.INTENT_EXAMPLES.items():
             example_embs = self.embedder.encode(examples)
-
-            # cosine similarity
             scores = np.dot(example_embs, message_emb[0]) / (
                 np.linalg.norm(example_embs, axis=1) * np.linalg.norm(message_emb[0]) + 1e-8
             )
-
             max_score = float(scores.max())
-
             if max_score > best_score:
                 best_score = max_score
                 best_intent = intent
-
         if best_score >= threshold:
             return best_intent
-
         return None
 
     def classify_by_keywords(self, message: str) -> Optional[str]:
-        """
-        Classify intent using keyword matching
-
-        Args:
-            message: User message
-
-        Returns:
-            Intent string or None if no match
-        """
         message_lower = message.lower()
-
-        # Check each intent's keywords
         for intent, keywords in self.INTENT_KEYWORDS.items():
             for keyword in keywords:
                 if keyword in message_lower:
                     return intent
-
         return None
 
     def classify_with_llm(self, message: str) -> str:
-        """
-        Classify intent using LLM when keywords don't match
-
-        Args:
-            message: User message
-
-        Returns:
-            Intent string
-        """
-        # Simple heuristic fallback if no LLM available
         if self.llm_classifier is None:
-            # Check if it's a question
             if "?" in message:
                 return "policy_question"
-            # Default to off_topic
             return "off_topic"
-
-        # TODO: Implement LLM-based classification if needed
         return "off_topic"
 
     def classify(self, message: str) -> str:
-        """
-        Main classification method using hybrid approach
-
-        Args:
-            message: User message
-
-        Returns:
-            Classified intent
-        """
-        # 1) Try keyword (fast, cheap)
         intent = self.classify_by_keywords(message)
         if intent:
             return intent
-
-        # 2) Try semantic similarity (smart)
         intent = self.classify_by_semantic_similarity(message)
         if intent:
             return intent
-
-        # 3) Fallback to LLM or heuristic
         return self.classify_with_llm(message)
 
 # ============================================================================
-# SECTION 7: RAG PIPELINE - EMBEDDINGS AND FAISS
+# SECTION 7: RAG PIPELINE
 # ============================================================================
 
 class RAGPipeline:
-    """
-    Retrieval-Augmented Generation pipeline using sentence-transformers and FAISS
-    """
-
     def __init__(self, embedding_model_name: str = "all-MiniLM-L6-v2"):
-        """
-        Initialize RAG pipeline
-
-        Args:
-            embedding_model_name: Name of the sentence-transformer model
-        """
         print(f"Loading embedding model: {embedding_model_name}...")
         self.embedding_model = SentenceTransformer(embedding_model_name)
-        self.embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
-
-        # FAISS index
+        self.embedding_dim = self.embedding_model.get_embedding_dimension()
         self.index = None
         self.documents = []
         self.metadata = []
-
         print("RAG pipeline initialized")
 
     def build_index(self, documents: List[str], metadata: List[Dict] = None):
-        """
-        Build FAISS index from documents
-
-        Args:
-            documents: List of text documents to index
-            metadata: Optional metadata for each document
-        """
         print(f"Building FAISS index for {len(documents)} documents...")
-
-        # Store documents
         self.documents = documents
         self.metadata = metadata if metadata else [{}] * len(documents)
-
-        # Generate embeddings
         embeddings = self.embedding_model.encode(documents, show_progress_bar=True)
         embeddings = np.array(embeddings).astype('float32')
-
-        # Create FAISS index
         self.index = faiss.IndexFlatL2(self.embedding_dim)
         self.index.add(embeddings)
-
         print(f"FAISS index built with {self.index.ntotal} vectors")
 
     def search(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
-        """
-        Search for relevant documents using similarity search
-
-        Args:
-            query: Query text
-            top_k: Number of top results to return
-
-        Returns:
-            List of dictionaries containing document and metadata
-        """
         if self.index is None:
             return []
-
-        # Encode query
         query_embedding = self.embedding_model.encode([query])
         query_embedding = np.array(query_embedding).astype('float32')
-
-        # Search FAISS index
         distances, indices = self.index.search(query_embedding, top_k)
-
-        # Prepare results
         results = []
         for idx, distance in zip(indices[0], distances[0]):
             if idx < len(self.documents):
@@ -668,47 +571,26 @@ class RAGPipeline:
                     "metadata": self.metadata[idx],
                     "distance": float(distance)
                 })
-
         return results
 
 # ============================================================================
-# SECTION 8: LLM CONFIGURATION AND LOADING
+# SECTION 8: LLM ENGINE
 # ============================================================================
 
 class LLMEngine:
-    """
-    LLM engine using HuggingFace transformers with 4-bit quantization
-    """
-
     def __init__(self, model_name: str = "Qwen/Qwen2.5-3B-Instruct"):
-        """
-        Initialize LLM with 4-bit quantization for Colab GPU
-
-        Args:
-            model_name: HuggingFace model name
-        """
         self.model_name = model_name
         self.tokenizer = None
         self.model = None
-
         print(f"Initializing LLM: {model_name}")
 
     def load_model(self):
-        """
-        Load model with 4-bit quantization
-        """
         try:
             print("Loading tokenizer...")
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                trust_remote_code=True
-            )
-
-            # Set pad token if not set
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
 
-            # Configure 4-bit quantization
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_compute_dtype=torch.float16,
@@ -723,27 +605,19 @@ class LLMEngine:
                 device_map="auto",
                 trust_remote_code=True
             )
-
             print("✓ Model loaded successfully!")
-
         except Exception as e:
             print(f"✗ Error loading model: {e}")
             raise e
+
     def generate_from_messages(self, system_message: str, user_message: str,
-                               max_new_tokens=150, temperature=0.2):
+                               max_new_tokens=300, temperature=0.2):
         messages = [
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message}
         ]
-
-        text = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
-
+        text = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
-
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
@@ -754,50 +628,21 @@ class LLMEngine:
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
             )
-
         return self.tokenizer.decode(
             outputs[0][inputs["input_ids"].shape[1]:],
             skip_special_tokens=True
         ).strip()
-    
 
     def generate(self, prompt: str, max_new_tokens: int = 256, temperature: float = 0.7) -> str:
-        """
-        Generate text using the LLM
-
-        Args:
-            prompt: Input prompt
-            max_new_tokens: Maximum tokens to generate
-            temperature: Sampling temperature
-
-        Returns:
-            Generated text
-        """
         if self.model is None or self.tokenizer is None:
             return "Error: Model not loaded"
-
         try:
-            # Format prompt for chat models
             messages = [
                 {"role": "system", "content": "You are EduBot, a helpful and friendly school support specialist."},
                 {"role": "user", "content": prompt}
             ]
-
-            text = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
-            )
-
-            # Tokenize input
-            inputs = self.tokenizer(
-                text,
-                return_tensors="pt",
-                truncation=True,
-                max_length=2048
-            ).to(self.model.device)
-
-            # Generate
+            text = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
             with torch.no_grad():
                 outputs = self.model.generate(
                     **inputs,
@@ -808,197 +653,151 @@ class LLMEngine:
                     pad_token_id=self.tokenizer.pad_token_id,
                     eos_token_id=self.tokenizer.eos_token_id
                 )
-
-            # Decode
-            generated_text = self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
-
-            return generated_text.strip()
-
+            return self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True).strip()
         except Exception as e:
             print(f"Error during generation: {e}")
             return "I apologize, but I'm having trouble generating a response right now."
 
 # ============================================================================
-# SECTION 9: EDUBOT ASSISTANT - MAIN HANDLER
+# SECTION 9: EDUBOT MAIN CLASS
 # ============================================================================
 
 class EduBot:
-    """
-    Main EduBot assistant class integrating all components
-    """
-
     def __init__(self):
-        """
-        Initialize EduBot with all components
-        """
         print("=" * 80)
         print("INITIALIZING EDUBOT SYSTEM")
         print("=" * 80)
-
-        # Load prompt configuration
         self.prompt_config = yaml.safe_load(PROMPT_CONFIG_YAML)
-
-        # Initialize components
         self.intent_classifier = IntentClassifier()
         self.rag_pipeline = RAGPipeline()
-        self.llm_engine = None  # Will be loaded separately due to size
-
-        # Build knowledge base
+        self.llm_engine = None
         self._build_knowledge_base()
-
         print("EduBot initialized successfully")
 
     def _build_knowledge_base(self):
-        """
-        Build FAISS index from policies and other documents
-        """
         print("\nBuilding knowledge base...")
-
-        # Prepare policy documents for indexing
         documents = []
         metadata = []
-
         for policy in POLICIES:
-            # Index both question and answer for better retrieval
             doc_text = f"Policy regarding {policy['category']}: {policy['question']} Answer: {policy['answer']}"
             documents.append(doc_text)
             metadata.append(policy)
-
-        # Add general help information
-        # TODO: Add more learning materials and guidelines
         documents.append("EduBot can help with grades, attendance, payments, policies, and general school questions.")
         metadata.append({"type": "general_help"})
-
-        # Build FAISS index
         self.rag_pipeline.build_index(documents, metadata)
 
     def load_llm(self, model_name: str = "Qwen/Qwen2.5-3B-Instruct"):
-        """
-        Load LLM model (separate method due to size)
-
-        Args:
-            model_name: HuggingFace model name
-        """
         self.llm_engine = LLMEngine(model_name)
         self.llm_engine.load_model()
 
     def _retrieve_context(self, message: str, intent: str) -> str:
-        """
-        Retrieve relevant context from knowledge base
-
-        Args:
-            message: User message
-            intent: Classified intent
-
-        Returns:
-            Context text for the LLM
-        """
-        # Retrieve relevant documents
         results = self.rag_pipeline.search(message, top_k=2)
-
         if not results:
             return "No specific policy or guideline found for this query."
-
-        # Build context - just the raw information without policy IDs
         context_parts = []
-
         for result in results:
             metadata = result['metadata']
             if 'answer' in metadata:
-                # Just include the policy answer without the ID
                 context_parts.append(metadata['answer'])
             elif 'document' in result:
                 context_parts.append(result['document'])
+        return "\n\n".join(context_parts)
 
-        context_text = "\n\n".join(context_parts)
-        return context_text
-
-    async def _call_function(self, intent: str, token: str, role: str) -> Optional[Dict[str, Any]]:
+    async def _call_function(self, intent: str, token: str, role: str,
+                            message: str = "") -> Optional[Dict[str, Any]]:
         functions_called = []
 
         try:
-            if intent == "grade_inquiry":
-                result = await getGrades(token, role)
-                functions_called.append("getGrades")
-                print(f"[DEBUG] Grades result: {result}")
-                return {"result": result, "functions": functions_called}
+            # ── STUDENT ──
+            if role == "student":
+                if intent == "grade_inquiry":
+                    result = await getGrades(token, role)
+                    functions_called.append("getGrades")
+                    return {"result": result, "functions": functions_called}
 
-            elif intent == "attendance":
-                result = await getAttendance(token, role)
-                functions_called.append("getAttendance")
-                print(f"[DEBUG] Attendance result: {result}")
-                return {"result": result, "functions": functions_called}
+                elif intent == "attendance":
+                    result = await getAttendance(token, role)
+                    functions_called.append("getAttendance")
+                    return {"result": result, "functions": functions_called}
+                
+                elif intent == "schedule":
+                    result = await getSchedule(token, role)
+                    functions_called.append("getSchedule")
+                    return {"result": result, "functions": functions_called}
+
+            # ── PARENT ──
+            elif role == "parent":
+                if intent in ["grade_inquiry", "attendance"]:
+                    # Step 1: fetch all children
+                    children_result = await getParentChildren(token)
+                    functions_called.append("getParentChildren")
+
+                    if not children_result["success"]:
+                        return {"result": children_result, "functions": functions_called}
+
+                    children = children_result["children"]
+
+                    # Step 2: try to find a specific child by name in the message
+                    message_lower = message.lower()
+                    matched_child = None
+                    for child in children:
+                        if child["name"].lower().split()[0] in message_lower or \
+                        child["name"].lower() in message_lower:
+                            matched_child = child
+                            break
+
+                    # Step 3: if name found → fetch that child's data
+                    if matched_child:
+                        if intent == "grade_inquiry":
+                            result = await getGradesForChild(token, matched_child["id"])
+                            functions_called.append("getGradesForChild")
+                            result["child_name"] = matched_child["name"]
+                        else:
+                            result = await getAttendanceForChild(token, matched_child["id"])
+                            functions_called.append("getAttendanceForChild")
+                            result["child_name"] = matched_child["name"]
+                        return {"result": result, "functions": functions_called}
+
+                    # Step 4: no name found → return all children list
+                    return {
+                        "result": {
+                            "success": True,
+                            "children_list": children,
+                            "requested_intent": intent  
+                        },
+                        "functions": functions_called
+                    }
 
         except PermissionError as e:
             return {"error": str(e), "functions": functions_called}
 
         return None
 
-    def _format_prompt(self, message: str, intent: str, role: str, context: str, function_result: Optional[Dict] = None) -> str:
-        """
-        Format the final prompt for the LLM
-
-        Args:
-            message: User message
-            intent: Classified intent
-            role: User role
-            context: Retrieved context
-            function_result: Optional function call result
-
-        Returns:
-            Formatted prompt
-        """
-        # Get tone instruction based on intent
+    def _format_prompt(self, message: str, intent: str, role: str, context: str,
+                       function_result: Optional[Dict] = None) -> str:
         tone_guidelines = self.prompt_config.get('tone_guidelines', {})
         tone_info = tone_guidelines.get(intent, {})
         tone_instruction = f"Use a {tone_info.get('style', 'professional')} tone. {tone_info.get('approach', '')}"
 
-        # Add function result to context if available
         if function_result and 'result' in function_result:
             result_data = function_result['result']
             if result_data.get('success'):
-                # Format the data naturally for the LLM
-                if 'grades' in result_data:
-                    grades_info = "Student's current grades:\n"
-                    for grade in result_data['grades']:
-                        grades_info += f"- {grade['subject']}: {grade['score']}/{grade['max_score']} ({grade['term']})\n"
-                    context = grades_info + "\n" + context
-
-                elif 'attendance' in result_data:
-                    att = result_data['attendance']
-                    attendance_info = f"Student's attendance record:\n"
-                    attendance_info += f"- Total days: {att['total_days']}\n"
-                    attendance_info += f"- Days present: {att['present']}\n"
-                    attendance_info += f"- Days absent: {att['absent']}\n"
-                    attendance_info += f"- Attendance rate: {att['percentage']}%\n"
-                    if att.get('recent_absences'):
-                        attendance_info += f"- Recent absences: {', '.join(att['recent_absences'])}\n"
-                    context = attendance_info + "\n" + context
-
-                elif 'payments' in result_data:
-                    payments_info = "Payment records:\n"
-                    for payment in result_data['payments']:
-                        payments_info += f"- {payment['description']}: ${payment['amount']} ({payment['status']}) - Due: {payment['due_date']}\n"
-                    context = payments_info + "\n" + context
-                elif 'materials' in result_data:
+                if 'materials' in result_data:
                     mats = result_data['materials']
                     materials_info = "Materials:\n"
                     for m in mats:
                         materials_info += f"- {m}\n"
                     context = materials_info + "\n" + context
-
                 elif 'schedule' in result_data:
                     sched = result_data['schedule']
                     schedule_info = "Class schedule:\n"
                     for day, subjects in sched.items():
                         schedule_info += f"{day}: {', '.join(subjects)}\n"
                     context = schedule_info + "\n" + context
-    
 
         elif function_result and 'error' in function_result:
             context = f"PERMISSION ISSUE: {function_result['error']}\n\n" + context
 
-        # Format using template
         template = self.prompt_config.get('response_template', '')
         prompt = template.format(
             context=context,
@@ -1006,35 +805,8 @@ class EduBot:
             question=message,
             tone_instruction=tone_instruction
         )
-
-        # Add system role
         system_role = self.prompt_config.get('system_role', '')
-        full_prompt = f"{system_role}\n\n{prompt}"
-
-        return full_prompt
-    
-        # Helper function
-    def _llm_rephrase_facts(self, facts_text: str, intent: str) -> str:
-
-        if not self.llm_engine or not self.llm_engine.model:
-            return facts_text
-
-        system_message = f"""You are a school assistant. Present ONLY the following facts to the student.
-    DO NOT add anything. DO NOT make up any information. DO NOT say anything not in the facts below.
-    If the facts contain grades, list every single one exactly as given.
-    If the facts contain attendance, report the exact numbers given.
-
-    FACTS (use ONLY these, nothing else):
-    {facts_text}"""
-
-        user_message = f"Present these {intent} facts to the student in a friendly but precise way. Only use what is listed above."
-
-        return self.llm_engine.generate_from_messages(
-            system_message=system_message,
-            user_message=user_message,
-            max_new_tokens=400,
-            temperature=0.1
-        )
+        return f"{system_role}\n\n{prompt}"
 
     def _format_grades_response(self, grades: list) -> str:
         from collections import defaultdict
@@ -1064,29 +836,33 @@ class EduBot:
             lines.append("\n⚠️ Remember, 90% attendance is required for final exams.")
         return "\n".join(lines)
 
-    async def handle_chat(self, requesterId: str, role: str, targetUserId: str, message: str, token: str) -> Dict[str, Any]:
+    def _llm_rephrase_facts(self, facts_text: str, intent: str) -> str:
+        if not self.llm_engine or not self.llm_engine.model:
+            return facts_text
+        system_message = f"""You are a school assistant. Present ONLY the following facts to the student.
+DO NOT add anything. DO NOT make up any information. DO NOT say anything not in the facts below.
+If the facts contain grades, list every single one exactly as given.
+If the facts contain attendance, report the exact numbers given.
 
-        """
-        Main chat handling function
+FACTS (use ONLY these, nothing else):
+{facts_text}"""
+        user_message = f"Present these {intent} facts to the student in a friendly but precise way. Only use what is listed above."
+        return self.llm_engine.generate_from_messages(
+            system_message=system_message,
+            user_message=user_message,
+            max_new_tokens=400,
+            temperature=0.1
+        )
 
-        Args:
-            requesterId: Requester ID
-            targetUserId: Target user ID
-            role: User role (student, teacher, parent, admin)
-            message: User message
-            token: User authentication token
-
-        Returns:
-            Response dictionary with text, intent, and functions called
-        """
-        print(f"\n[EduBot] Processing message from {role} ({requesterId}) about ({targetUserId}): {message}")
-
+    async def handle_chat(self, requesterId: str, role: str, targetUserId: str,
+                          message: str, token: str) -> Dict[str, Any]:
+        print(f"\n[EduBot] Processing message from {role} ({requesterId}): {message}")
 
         # Step 1: Classify intent
         intent = self.intent_classifier.classify(message)
         print(f"[Intent] Classified as: {intent}")
 
-        # Step 2: Handle violations immediately
+        # Step 2: Handle violations
         if intent == "violation":
             return {
                 "text": "I'm sorry, but I cannot assist with that request. As EduBot, I'm here to help with legitimate school-related questions and support. Please ask me about grades, attendance, policies, or other educational topics.",
@@ -1094,7 +870,7 @@ class EduBot:
                 "functionsCalled": []
             }
 
-        # Step 3: Handle chitchat briefly
+        # Step 3: Handle chitchat
         if intent == "chitchat":
             chitchat_responses = {
                 "hello": "Hello! I'm EduBot, your Student Support Specialist. How can I assist you today?",
@@ -1105,44 +881,38 @@ class EduBot:
             }
             for key, response in chitchat_responses.items():
                 if key in message.lower():
-                    return {
-                        "text": response,
-                        "intent": intent,
-                        "functionsCalled": []
-                    }
+                    return {"text": response, "intent": intent, "functionsCalled": []}
 
-        # Step 4: Retrieve context from RAG
+        # Step 4: Retrieve context
         context = self._retrieve_context(message, intent)
         print(f"[RAG] Retrieved context from knowledge base")
-        # 🔐 Scope check: only admin can access other users
-        if requesterId != targetUserId and role != "admin":
+
+        # Step 5: Scope check
+        if requesterId != targetUserId and role != "admin" and role != "parent":
             return {
-                "text": "Sorry, you’re not allowed to view other users’ private information.",
+                "text": "Sorry, you're not allowed to view other users' private information.",
                 "intent": intent,
                 "functionsCalled": []
             }
 
-        # Step 5: Call functions if needed
-        function_result = await self._call_function(intent, token, role)
+        # Step 6: Call functions
+        function_result = await self._call_function(intent, token, role, message)
 
         if function_result and 'error' in function_result:
             friendly_map = {
-                "payment_info": "payment information",
                 "grade_inquiry": "grades",
                 "attendance": "attendance records"
             }
-
             thing = friendly_map.get(intent, "this information")
-
             return {
-                "text": f"Sorry, you’re not allowed to view {thing}. Please contact the school administration if you think this is a mistake.",
+                "text": f"Sorry, you're not allowed to view {thing}. Please contact the school administration if you think this is a mistake.",
                 "intent": intent,
                 "functionsCalled": []
             }
 
         functions_called = function_result.get('functions', []) if function_result else []
 
-        # Step 6: Handle off-topic
+        # Step 7: Handle off-topic
         if intent == "off_topic":
             return {
                 "text": "I appreciate your message! However, I'm EduBot, and I'm here specifically to help with school-related questions like grades, attendance, policies, and payments. Is there anything related to your education or school experience I can help you with?",
@@ -1150,65 +920,94 @@ class EduBot:
                 "functionsCalled": functions_called
             }
         
+
+        # Handle parent children list (when no specific child named)
+        if function_result and "result" in function_result:
+            result_data = function_result["result"]
+            if result_data.get("children_list"):
+                children = result_data["children_list"]
+                intent_word = "grades" if result_data.get("requested_intent") == "grade_inquiry" else "attendance"
+                names = [f"• {c['name']} ({c['class']} {c['section']})" for c in children]
+                return {
+                    "text": f"You have {len(children)} children enrolled:\n" + "\n".join(names) +
+                            f"\n\nWhich child's {intent_word} would you like to see? Just mention their name!",
+                    "intent": intent,
+                    "functionsCalled": function_result.get("functions", [])
+                }
+
+        # Step 8: Handle grades
         if intent == "grade_inquiry" and function_result and "result" in function_result:
             result_data = function_result["result"]
-            if result_data.get("success"):
+            if result_data.get("success") and "grades" in result_data:
                 grades = result_data.get("grades", [])
+                child_name = result_data.get("child_name", "")
+                from collections import defaultdict
+                by_subject = defaultdict(list)
+                for g in grades:
+                    by_subject[g['subject']].append(g)
+                header = f"Here are {child_name}'s grades:\n" if child_name else "Here are your current grades:\n"
+                lines = [header]
+                for subject, entries in by_subject.items():
+                    lines.append(f"📚 {subject}:")
+                    for e in entries:
+                        lines.append(f"   • {e['term']}: {e['score']}/{e['max_score']}")
+                return {"text": "\n".join(lines), "intent": intent, "functionsCalled": functions_called}
+            else:
                 return {
-                    "text": self._format_grades_response(grades),
+                    "text": f"Sorry, I couldn't retrieve the grades right now. {result_data.get('message', '')}",
                     "intent": intent,
                     "functionsCalled": functions_called
                 }
 
+        # Step 9: Handle attendance
         if intent == "attendance" and function_result and "result" in function_result:
             result_data = function_result["result"]
-            if result_data.get("success"):
+            if result_data.get("success") and "attendance" in result_data:
                 att = result_data["attendance"]
+                child_name = result_data.get("child_name", "")
+                header = f"Here is {child_name}'s attendance record:\n" if child_name else "Here is your attendance record:\n"
+                lines = [
+                    header,
+                    f"📅 Total days: {att['total_days']}",
+                    f"✅ Present: {att['present']}",
+                    f"❌ Absent: {att['absent']}",
+                    f"📊 Attendance rate: {att['percentage']}%",
+                ]
+                if att.get('recent_absences'):
+                    lines.append(f"🗓 Recent absences: {', '.join(att['recent_absences'])}")
+                if att['percentage'] >= 90:
+                    lines.append("\nGreat job maintaining excellent attendance! 🎉")
+                else:
+                    lines.append("\n⚠️ Remember, 90% attendance is required for final exams.")
+                return {"text": "\n".join(lines), "intent": intent, "functionsCalled": functions_called}
+            else:
                 return {
-                    "text": self._format_attendance_response(att),
+                    "text": f"Sorry, I couldn't retrieve the attendance right now. {result_data.get('message', '')}",
                     "intent": intent,
                     "functionsCalled": functions_called
                 }
+
+        # Step 10: Handle schedule
         if intent == "schedule" and function_result and "result" in function_result:
             result_data = function_result["result"]
             if result_data.get("success"):
                 sched = result_data.get("schedule", {})
-
-                # Build FACTS text
-                facts_lines = []
-                for day, subjects in sched.items():
-                    facts_lines.append(f"- {day}: {', '.join(subjects)}")
-
+                facts_lines = [f"- {day}: {', '.join(subjects)}" for day, subjects in sched.items()]
                 facts_text = "\n".join(facts_lines)
-
-                # Ask LLM to rephrase (wording only)
                 friendly_text = self._llm_rephrase_facts(facts_text, intent)
+                return {"text": friendly_text, "intent": intent, "functionsCalled": functions_called}
 
-
-                return {
-                    "text": friendly_text,
-                    "intent": intent,
-                    "functionsCalled": functions_called
-                }
-
+        # Step 11: Handle materials
         if intent == "materials" and function_result and "result" in function_result:
             result_data = function_result["result"]
             if result_data.get("success"):
                 mats = result_data.get("materials", [])
-
                 facts_lines = [f"- {m}" for m in mats]
                 facts_text = "\n".join(facts_lines)
-
                 friendly_text = self._llm_rephrase_facts(facts_text, intent)
+                return {"text": friendly_text, "intent": intent, "functionsCalled": functions_called}
 
-                return {
-                    "text": friendly_text,
-                    "intent": intent,
-                    "functionsCalled": functions_called
-                }
-
-
-        # Step 7: Generate response using LLM (ALWAYS for non-chitchat/non-violation/non-off-topic)
+        # Step 12: LLM for everything else (policy questions, complaints, etc.)
         if self.llm_engine and self.llm_engine.model:
             print("[LLM] 🤖 Generating natural, human-like response...")
             prompt = self._format_prompt(message, intent, role, context, function_result)
@@ -1216,102 +1015,60 @@ class EduBot:
             print("[LLM] ✓ Response generated")
         else:
             print("[Fallback] ⚠ Using pre-written response (LLM not loaded)")
-            # Fallback response without LLM
             response_text = self._generate_fallback_response(intent, context, function_result)
 
-        # Step 8: Return structured response
-        return {
-            "text": response_text,
-            "intent": intent,
-            "functionsCalled": functions_called
-        }
+        return {"text": response_text, "intent": intent, "functionsCalled": functions_called}
 
-    def _generate_fallback_response(self, intent: str, context: str, function_result: Optional[Dict]) -> str:
-        """
-        Generate a response without LLM (for testing without model loaded)
+    def _generate_fallback_response(self, intent: str, context: str,
+                                    function_result: Optional[Dict]) -> str:
+        if function_result and 'error' in function_result:
+            return f"I apologize, but I'm unable to access that information. If you believe you should have access to this, please contact the administration office."
 
-        Args:
-            intent: Classified intent
-            context: Retrieved context
-            function_result: Function call result
-
-        Returns:
-            Fallback response text
-        """
-        # Note: This is a simple fallback - the LLM will make this much more natural
-        response_parts = []
-
-        if function_result:
-            if 'error' in function_result:
-                return f"I apologize, but I'm unable to access that information. {function_result['error']} If you believe you should have access to this, please contact the administration office."
-
-            if 'result' in function_result:
-                result_data = function_result['result']
-                if intent == "grade_inquiry" and result_data.get('success'):
-                    grades = result_data['grades']
-                    response_parts.append("I've pulled up your current grades. Here's how you're doing:")
-                    for grade in grades:
-                        response_parts.append(f"• {grade['subject']}: {grade['grade']} ({grade['score']}%)")
-                    response_parts.append("\nYou're doing great! Keep up the good work.")
-
-                elif intent == "attendance" and result_data.get('success'):
-                    attendance = result_data['attendance']
-                    response_parts.append(f"Looking at your attendance record, you're at {attendance['percentage']}% attendance rate. ")
-                    response_parts.append(f"That's {attendance['present']} days present out of {attendance['total_days']} total days. ")
-                    if attendance['percentage'] >= 90:
-                        response_parts.append("Great job maintaining excellent attendance!")
-                    else:
-                        response_parts.append("Remember, we require 90% attendance to be eligible for final exams. Let me know if you need any support!")
-
-                elif intent == "payment_info" and result_data.get('success'):
-                    payments = result_data['payments']
-                    response_parts.append("Here's your current payment status:")
-                    for payment in payments:
-                        status_emoji = "✓" if payment['status'] == 'Paid' else "⏳"
-                        response_parts.append(f"{status_emoji} {payment['description']}: ${payment['amount']} ({payment['status']})")
-                    response_parts.append("\nIf you have any questions about payments, feel free to ask!")
-
-        if not response_parts and context:
-            # For policy questions
+        if not function_result and context:
             if intent == "policy_question":
-                response_parts.append("Great question! Let me explain our policy on that.")
-                response_parts.append(f"\n{context}")
-                response_parts.append("\nLet me know if you need any clarification on this!")
+                return f"Great question! {context}\n\nLet me know if you need any clarification!"
 
-        return "\n".join(response_parts) if response_parts else "I'd be happy to help! Could you please provide more details about your question?"
+        return "I'd be happy to help! Could you please provide more details about your question?"
 
 # ============================================================================
-# SECTION 10: API-READY STRUCTURE (COMMENTED FOR FUTURE USE)
+# SECTION 10: FASTAPI APP
 # ============================================================================
 
-
-# Uncomment this section to enable FastAPI endpoint
-
-from fastapi import FastAPI, HTTPException, Header  
+from fastapi import FastAPI, HTTPException, Header
+from fastapi.responses import Response
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional                         
-import httpx                                         
+from typing import Optional
+import httpx
 
 app = FastAPI(title="EduGate API", description="School AI Assistant API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # allows all origins (fine for Colab/dev)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ⚠️ IMPORTANT: Update this with your Laravel ngrok URL every session
+LARAVEL_API_URL = "https://ef57-80-77-189-240.ngrok-free.app"
+
 # Initialize EduBot globally
 edubot = EduBot()
 edubot.load_llm("Qwen/Qwen2.5-3B-Instruct")
 
-LARAVEL_API_URL = "https://2513-80-77-189-240.ngrok-free.app"  # ← change this
 
 class ChatRequest(BaseModel):
     targetUserId: Optional[str] = None
     message: str
+
+
+class ChatResponse(BaseModel):
+    text: str
+    intent: str
+    functionsCalled: list
+
 
 async def get_authenticated_user(authorization: str) -> dict:
     if not authorization.startswith("Bearer "):
@@ -1323,7 +1080,7 @@ async def get_authenticated_user(authorization: str) -> dict:
                 f"{LARAVEL_API_URL}/api/me",
                 headers={
                     "Authorization": f"Bearer {token}",
-                    "ngrok-skip-browser-warning": "true"  
+                    "ngrok-skip-browser-warning": "true"
                 }
             )
         except Exception:
@@ -1333,12 +1090,6 @@ async def get_authenticated_user(authorization: str) -> dict:
     return resp.json()
 
 
-class ChatResponse(BaseModel):
-    text: str
-    intent: str
-    functionsCalled: list
-
-@app.post("/chat", response_model=ChatResponse)
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest, authorization: str = Header(...)):
     try:
@@ -1346,21 +1097,20 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(...)):
         requester_id = str(auth_user["id"])
         role = auth_user["role"]
         target_user_id = request.targetUserId or requester_id
-        token = authorization.replace("Bearer ", "")  # ← extract token
 
         response = await edubot.handle_chat(
             requesterId=requester_id,
             role=role,
             targetUserId=target_user_id,
             message=request.message,
-            token=token  # ← pass token
+            token=authorization.replace("Bearer ", "")  # ← extract here
         )
         return response
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-from fastapi.responses import Response
+
 
 @app.options("/chat")
 async def options_chat():
@@ -1369,136 +1119,15 @@ async def options_chat():
         headers={
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, ngrok-skip-browser-warning",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, ngrok-skip-browser-warning",
         }
     )
 
-# To run in Colab with ngrok:
-# !pip install fastapi uvicorn pyngrok
-# from pyngrok import ngrok
-# import nest_asyncio
-# import uvicorn
-#
-# nest_asyncio.apply()
-# ngrok_tunnel = ngrok.connect(8000)
-# print('Public URL:', ngrok_tunnel.public_url)
-# uvicorn.run(app, host='0.0.0.0', port=8000)
-
-
 # ============================================================================
-# SECTION 11: TESTING AND CLI INTERFACE FOR COLAB
-# ============================================================================
-
-def run_colab_test():
-    """
-    Interactive testing interface for Google Colab
-    """
-    print("\n" + "=" * 80)
-    print("EDUBOT - INTERACTIVE TESTING MODE")
-    print("=" * 80)
-
-    # Initialize EduBot
-    edubot = EduBot()
-
-    # Ask if user wants to load LLM
-    print("\nDo you want to load the LLM model?")
-    print("OPTIONS:")
-    print("1. 'yes' - Load Qwen 2.5 3B model (recommended, fast, works without auth)")
-    print("2. 'llama' - Load Llama 3.1 8B (requires HuggingFace auth)")
-    print("3. 'no' - Use fallback responses (quick testing)")
-
-    load_llm = input("\nYour choice (yes/llama/no): ").strip().lower()
-
-    if load_llm == 'yes':
-        print("\n🚀 Loading Qwen 2.5 3B Instruct model (no authentication required)...")
-        print("This model is excellent for conversational AI and works great in Colab!")
-        try:
-            edubot.load_llm("Qwen/Qwen2.5-3B-Instruct")
-        except Exception as e:
-            print(f"\n✗ Error loading LLM: {e}")
-            print("Continuing with fallback responses...")
-            import traceback
-            traceback.print_exc()
-
-    elif load_llm == 'llama':
-        print("\nLoading Llama 3.1 8B model...")
-        print("Note: This requires HuggingFace authentication.")
-        print("Make sure you have:")
-        print("1. Accepted the Llama model license on HuggingFace")
-        print("2. Run: huggingface-cli login")
-
-        try:
-            edubot.load_llm("meta-llama/Meta-Llama-3.1-8B-Instruct")
-        except Exception as e:
-            print(f"\n✗ Error loading LLM: {e}")
-            print("Continuing with fallback responses...")
-    else:
-        print("\nUsing fallback responses (no LLM generation)")
-
-    # Select test user
-    print("\n" + "-" * 80)
-    print("SELECT A TEST USER:")
-    print("-" * 80)
-    for user_id, user_data in MOCK_USERS.items():
-        print(f"{user_id}: {user_data['name']} ({user_data['role']})")
-
-    selected_user_id = input("\nEnter user ID (or press Enter for user001): ").strip() or "user001"
-    selected_user = MOCK_USERS.get(selected_user_id, MOCK_USERS["user001"])
-
-    print(f"\nTesting as: {selected_user['name']} ({selected_user['role']})")
-    print("-" * 80)
-
-    # Example queries to try
-    print("\nEXAMPLE QUERIES TO TRY:")
-    print("- What's my grade in Mathematics?")
-    print("- Can you tell me about my grades?")
-    print("- What is the attendance policy?")
-    print("- Show me my attendance record")
-    print("- What are the payment deadlines?")
-    print("- Tell me about the privacy policy")
-    print("- I have a complaint about my grade")
-    print("- Hello, how are you?")
-    print("- Tell me about the weather")
-    print("- Type 'quit' to exit")
-    print("-" * 80)
-
-    # Interactive loop
-    while True:
-        user_message = input(f"\n[{selected_user['name']}]: ").strip()
-
-        if not user_message:
-            continue
-
-        if user_message.lower() in ['quit', 'exit', 'q']:
-            print("\nThank you for testing EduBot! Goodbye.")
-            break
-
-        # Process message
-        try:
-            response = edubot.handle_chat(
-                userId=selected_user_id,
-                role=selected_user['role'],
-                message=user_message
-            )
-
-            # Display response
-            print(f"\n[EduBot]: {response['text']}")
-            print(f"\n[Debug Info]")
-            print(f"  Intent: {response['intent']}")
-            print(f"  Functions Called: {response['functionsCalled']}")
-            print(f"  LLM Status: {'✓ Active (Human-like responses)' if edubot.llm_engine and edubot.llm_engine.model else '✗ Using Fallback (Pre-written)'}")
-
-        except Exception as e:
-            print(f"\n[Error]: {str(e)}")
-            import traceback
-            traceback.print_exc()
-
-# ============================================================================
-# SECTION 12: MAIN EXECUTION
+# SECTION 11: MAIN EXECUTION
 # ============================================================================
 
 if __name__ == "__main__":
-    # Check if running in Colab
     try:
         import google.colab
         IN_COLAB = True
@@ -1507,55 +1136,36 @@ if __name__ == "__main__":
 
     if IN_COLAB:
         print("Detected Google Colab environment")
-        print("\n" + "=" * 80)
-
-    # Disable CLI mode
-    # run_colab_test()
-
-    # ==============================
-    # 🚀 API MODE (Colab + Ngrok)
-    # ==============================
 
     print("==========================================")
     print("🔐 NGROK AUTHENTICATION REQUIRED")
-    print("Please paste your ngrok authtoken below.")
-    print("Get it from: https://dashboard.ngrok.com/get-started/your-authtoken")
+    print("Get your token from: https://dashboard.ngrok.com/get-started/your-authtoken")
     print("==========================================")
 
     ngrok_token = input("👉 Enter your ngrok authtoken: ").strip()
-
     if not ngrok_token:
         raise ValueError("❌ No ngrok token provided. Restart and enter your token.")
 
-    # Install API + tunnel tools (safe to run multiple times in Colab)
-    import subprocess, sys
+    laravel_url = input("👉 Enter your Laravel ngrok URL (e.g. https://xxxx.ngrok-free.app): ").strip()
+    if not laravel_url:
+        raise ValueError("❌ No Laravel URL provided.")
+    LARAVEL_API_URL = laravel_url
+
     subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "fastapi", "uvicorn", "pyngrok", "nest_asyncio"])
 
     from pyngrok import ngrok
     import nest_asyncio
     import uvicorn
-    import asyncio
+    import threading
 
-    # Configure ngrok
     ngrok.set_auth_token(ngrok_token)
-
-    # Allow nested event loop in Colab
     nest_asyncio.apply()
 
-    # Open tunnel
     public_url = ngrok.connect(8000)
     print("\n==========================================")
     print("🌍 Public API URL:", public_url.public_url)
-    print("➡️ Postman endpoint: POST", public_url.public_url + "/chat")
+    print("➡️  Postman endpoint: POST", public_url.public_url + "/chat")
     print("==========================================\n")
-
-    # ------------------------------
-    # Start FastAPI server (Colab-safe)
-    # ------------------------------
-    # ------------------------------
-  # Start FastAPI server (Colab-safe, threaded)
-  # ------------------------------
-    import threading
 
     def run_server():
         uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
@@ -1564,11 +1174,10 @@ if __name__ == "__main__":
     server_thread.start()
 
     print("✅ FastAPI server is running in background.")
-    print("🚀 You can now send requests from Postman.")
-
+    print("🚀 You can now send requests from Postman or the React app.")
 
 else:
-    print("EduBot module loaded. Use run_colab_test() to start interactive testing.")
+    print("EduBot module loaded.")
 
 # ============================================================================
 # END OF FILE

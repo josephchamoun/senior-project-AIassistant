@@ -1,0 +1,17 @@
+Every time you want to test the AI:
+1. Start Laravel
+php artisan serve
+2. Start ngrok for Laravel (new terminal)
+ngrok http 8000
+Copy the new ngrok URL (it changes every time!) and update LARAVEL_API_URL in Colab.
+3. Start Colab
+
+Open your Colab notebook
+Update LARAVEL_API_URL with the new ngrok URL
+Run all cells
+Copy the new FastAPI ngrok URL
+
+4. Update vite.config.js with the new FastAPI ngrok URL
+javascripttarget: 'https://new-fastapi-ngrok-url.ngrok-free.app',
+5. Start React (new terminal)
+npm run dev
