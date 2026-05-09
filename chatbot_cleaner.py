@@ -116,46 +116,7 @@ response_template: |
   Your response:
 """
 
-# ============================================================================
-# SECTION 3: MOCK DATA (kept for schedule/materials - not used for grades/attendance)
-# ============================================================================
 
-MOCK_USERS = {
-    "user001": {"userId": "user001", "name": "Alice Johnson", "role": "student", "grade": "11", "section": "A", "year": "2025"},
-    "user002": {"userId": "user002", "name": "Bob Smith", "role": "teacher", "grade": None},
-    "user003": {"userId": "user003", "name": "Carol White", "role": "parent", "grade": None},
-    "user004": {"userId": "user004", "name": "David Brown", "role": "admin", "grade": None},
-}
-
-MOCK_MATERIALS_BY_GRADE_YEAR = {
-    ("1", "2015"): ["French", "English", "Math"],
-    ("10", "2024"): ["Mathematics", "Physics", "English", "History"],
-    ("11", "2025"): ["Mathematics", "Physics", "Chemistry", "English", "Philosophy"],
-}
-
-MOCK_STUDENT_MATERIALS = {
-    "user001": {
-        "year": "2025",
-        "materials": ["Mathematics", "Physics", "English", "History"]
-    }
-}
-
-MOCK_SCHEDULES = {
-    ("11", "A", "2025"): {
-        "Monday": ["Math", "Physics", "English"],
-        "Tuesday": ["Chemistry", "Math", "Philosophy"],
-        "Wednesday": ["Physics", "English", "Math"],
-        "Thursday": ["Chemistry", "Philosophy", "English"],
-        "Friday": ["Math", "Physics", "Sports"],
-    },
-    ("10", "B", "2024"): {
-        "Monday": ["Math", "History", "English"],
-        "Tuesday": ["Physics", "Math", "English"],
-        "Wednesday": ["History", "Physics", "Math"],
-        "Thursday": ["English", "Math", "Sports"],
-        "Friday": ["Physics", "History", "English"],
-    }
-}
 
 # ============================================================================
 # SECTION 4: POLICY DATABASE
@@ -224,7 +185,7 @@ class PermissionError(Exception):
 # They are called only after LARAVEL_API_URL is set.
 
 async def getGrades(token: str, role: str) -> Dict[str, Any]:
-    if role not in ["student", "teacher", "admin"]:
+    if role != "student":
         raise PermissionError(f"Role '{role}' is not authorized to view grades")
 
     async with httpx.AsyncClient() as client:
@@ -257,7 +218,7 @@ async def getGrades(token: str, role: str) -> Dict[str, Any]:
 
 
 async def getAttendance(token: str, role: str) -> Dict[str, Any]:
-    if role not in ["student", "teacher", "admin"]:
+    if role != "student":
         raise PermissionError(f"Role '{role}' is not authorized to view attendance")
 
     async with httpx.AsyncClient() as client:
@@ -277,19 +238,22 @@ async def getAttendance(token: str, role: str) -> Dict[str, Any]:
     raw = resp.json()
     total = len(raw)
     present = sum(1 for r in raw if r["status"] == "present")
-    absent = total - present
+    late = sum(1 for r in raw if r["status"] == "late")
+    absent = sum(1 for r in raw if r["status"] == "absent")
     percentage = round((present / total) * 100, 1) if total > 0 else 0
     recent_absences = [r["date"] for r in raw if r["status"] == "absent"][:5]
+    recent_late = [r["date"] for r in raw if r["status"] == "late"][:5]
 
-    print(f"[DEBUG] getAttendance: total={total}, present={present}, absent={absent}, percentage={percentage}")
     return {
         "success": True,
         "attendance": {
             "total_days": total,
             "present": present,
+            "late": late,
             "absent": absent,
             "percentage": percentage,
-            "recent_absences": recent_absences
+            "recent_absences": recent_absences,
+            "recent_late": recent_late
         }
     }
 
@@ -360,58 +324,33 @@ async def getAttendanceForChild(token: str, studentId: int) -> Dict[str, Any]:
     raw = resp.json()
     total = len(raw)
     present = sum(1 for r in raw if r["status"] == "present")
-    absent = total - present
+    late = sum(1 for r in raw if r["status"] == "late")
+    absent = sum(1 for r in raw if r["status"] == "absent")
     percentage = round((present / total) * 100, 1) if total > 0 else 0
     recent_absences = [r["date"] for r in raw if r["status"] == "absent"][:5]
+    recent_late = [r["date"] for r in raw if r["status"] == "late"][:5]
 
     return {
         "success": True,
         "attendance": {
             "total_days": total,
             "present": present,
+            "late": late,
             "absent": absent,
             "percentage": percentage,
-            "recent_absences": recent_absences
+            "recent_absences": recent_absences,
+            "recent_late": recent_late
         }
-    }    
-
-
-def getStudentMaterials(userId: str, role: str) -> Dict[str, Any]:
-    if role != "student":
-        raise PermissionError("Only students can view their materials")
-    if userId in MOCK_STUDENT_MATERIALS:
-        return {
-            "success": True,
-            "userId": userId,
-            "year": MOCK_STUDENT_MATERIALS[userId]["year"],
-            "materials": MOCK_STUDENT_MATERIALS[userId]["materials"]
-        }
-    return {"success": False, "message": "No materials found for this student"}
-
-
-def getMaterialsByGradeYear(grade: str, year: str) -> Dict[str, Any]:
-    key = (grade, year)
-    if key in MOCK_MATERIALS_BY_GRADE_YEAR:
-        return {
-            "success": True,
-            "grade": grade,
-            "year": year,
-            "materials": MOCK_MATERIALS_BY_GRADE_YEAR[key]
-        }
-    return {"success": False, "message": "No materials found for this grade/year"}
-
+    }
 
 async def getSchedule(token: str, role: str) -> Dict[str, Any]:
-    if role not in ["student", "admin", "teacher"]:
-        raise PermissionError("You are not allowed to view schedules")
+    if role != "student":
+        raise PermissionError("Only students can view their own schedule")
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{LARAVEL_API_URL}/api/schedule/my",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "ngrok-skip-browser-warning": "true"
-            }
+            headers={"Authorization": f"Bearer {token}", "ngrok-skip-browser-warning": "true"}
         )
 
     print(f"[DEBUG] getSchedule status: {resp.status_code}")
@@ -419,16 +358,67 @@ async def getSchedule(token: str, role: str) -> Dict[str, Any]:
         return {"success": False, "message": "Could not fetch schedule"}
 
     raw = resp.json()
-    # Convert to simple format: {"Monday": ["Math 08:00-09:30", ...], ...}
     schedule = {}
     for day, entries in raw.items():
         schedule[day] = [
             f"{e['subject']['name']} ({e['start_time']}-{e['end_time']}, {e['room']})"
             for e in entries
         ]
-
     return {"success": True, "schedule": schedule}
 
+
+async def getScheduleForChild(token: str, studentId: int) -> Dict[str, Any]:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{LARAVEL_API_URL}/api/parent/children/{studentId}/schedule",
+            headers={"Authorization": f"Bearer {token}", "ngrok-skip-browser-warning": "true"}
+        )
+
+    print(f"[DEBUG] getScheduleForChild status: {resp.status_code}")
+    if resp.status_code != 200:
+        return {"success": False, "message": "Could not fetch schedule"}
+
+    raw = resp.json()
+    schedule = {}
+    for day, entries in raw.items():
+        schedule[day] = [
+            f"{e['subject']['name']} ({e['start_time']}-{e['end_time']}, {e['room']})"
+            for e in entries
+        ]
+    return {"success": True, "schedule": schedule}
+
+
+async def getSubjects(token: str, role: str) -> Dict[str, Any]:
+    if role != "student":
+        raise PermissionError("Only students can view their own subjects")
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{LARAVEL_API_URL}/api/subjects/my",
+            headers={"Authorization": f"Bearer {token}", "ngrok-skip-browser-warning": "true"}
+        )
+
+    print(f"[DEBUG] getSubjects status: {resp.status_code}")
+    if resp.status_code != 200:
+        return {"success": False, "message": f"Could not fetch subjects (status {resp.status_code})"}
+
+    subjects = [item["name"] for item in resp.json()]
+    return {"success": True, "subjects": subjects}
+
+
+async def getSubjectsForChild(token: str, studentId: int) -> Dict[str, Any]:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{LARAVEL_API_URL}/api/parent/children/{studentId}/subjects",
+            headers={"Authorization": f"Bearer {token}", "ngrok-skip-browser-warning": "true"}
+        )
+
+    print(f"[DEBUG] getSubjectsForChild status: {resp.status_code}")
+    if resp.status_code != 200:
+        return {"success": False, "message": "Could not fetch subjects"}
+
+    subjects = [item["name"] for item in resp.json()]
+    return {"success": True, "subjects": subjects}
 # ============================================================================
 # SECTION 6: HYBRID INTENT CLASSIFIER
 # ============================================================================
@@ -708,8 +698,13 @@ class EduBot:
         functions_called = []
 
         try:
+            # ── ADMIN / TEACHER: denied for all personal data ──
+            if role in ["admin", "teacher"]:
+                if intent in ["grade_inquiry", "attendance", "schedule", "materials"]:
+                    raise PermissionError("Admins and teachers cannot access personal student data through the chatbot")
+
             # ── STUDENT ──
-            if role == "student":
+            elif role == "student":
                 if intent == "grade_inquiry":
                     result = await getGrades(token, role)
                     functions_called.append("getGrades")
@@ -719,16 +714,21 @@ class EduBot:
                     result = await getAttendance(token, role)
                     functions_called.append("getAttendance")
                     return {"result": result, "functions": functions_called}
-                
+
                 elif intent == "schedule":
                     result = await getSchedule(token, role)
                     functions_called.append("getSchedule")
                     return {"result": result, "functions": functions_called}
 
+                elif intent == "materials":
+                    result = await getSubjects(token, role)
+                    functions_called.append("getSubjects")
+                    return {"result": result, "functions": functions_called}
+
             # ── PARENT ──
             elif role == "parent":
-                if intent in ["grade_inquiry", "attendance"]:
-                    # Step 1: fetch all children
+                if intent in ["grade_inquiry", "attendance", "schedule", "materials"]:
+                    # Step 1: get all children
                     children_result = await getParentChildren(token)
                     functions_called.append("getParentChildren")
 
@@ -737,7 +737,7 @@ class EduBot:
 
                     children = children_result["children"]
 
-                    # Step 2: try to find a specific child by name in the message
+                    # Step 2: try to match a child name from the message
                     message_lower = message.lower()
                     matched_child = None
                     for child in children:
@@ -746,24 +746,30 @@ class EduBot:
                             matched_child = child
                             break
 
-                    # Step 3: if name found → fetch that child's data
+                    # Step 3: child found — fetch their specific data
                     if matched_child:
                         if intent == "grade_inquiry":
                             result = await getGradesForChild(token, matched_child["id"])
                             functions_called.append("getGradesForChild")
-                            result["child_name"] = matched_child["name"]
-                        else:
+                        elif intent == "attendance":
                             result = await getAttendanceForChild(token, matched_child["id"])
                             functions_called.append("getAttendanceForChild")
-                            result["child_name"] = matched_child["name"]
+                        elif intent == "schedule":
+                            result = await getScheduleForChild(token, matched_child["id"])
+                            functions_called.append("getScheduleForChild")
+                        elif intent == "materials":
+                            result = await getSubjectsForChild(token, matched_child["id"])
+                            functions_called.append("getSubjectsForChild")
+
+                        result["child_name"] = matched_child["name"]
                         return {"result": result, "functions": functions_called}
 
-                    # Step 4: no name found → return all children list
+                    # Step 4: no child name found — return list and ask
                     return {
                         "result": {
                             "success": True,
                             "children_list": children,
-                            "requested_intent": intent  
+                            "requested_intent": intent
                         },
                         "functions": functions_called
                     }
@@ -926,7 +932,13 @@ FACTS (use ONLY these, nothing else):
             result_data = function_result["result"]
             if result_data.get("children_list"):
                 children = result_data["children_list"]
-                intent_word = "grades" if result_data.get("requested_intent") == "grade_inquiry" else "attendance"
+                intent_word_map = {
+                    "grade_inquiry": "grades",
+                    "attendance": "attendance",
+                    "schedule": "schedule",
+                    "materials": "subjects"
+                }
+                intent_word = intent_word_map.get(result_data.get("requested_intent"), "information")
                 names = [f"• {c['name']} ({c['class']} {c['section']})" for c in children]
                 return {
                     "text": f"You have {len(children)} children enrolled:\n" + "\n".join(names) +
@@ -960,6 +972,7 @@ FACTS (use ONLY these, nothing else):
                 }
 
         # Step 9: Handle attendance
+
         if intent == "attendance" and function_result and "result" in function_result:
             result_data = function_result["result"]
             if result_data.get("success") and "attendance" in result_data:
@@ -970,11 +983,14 @@ FACTS (use ONLY these, nothing else):
                     header,
                     f"📅 Total days: {att['total_days']}",
                     f"✅ Present: {att['present']}",
+                    f"⏰ Late: {att['late']}",
                     f"❌ Absent: {att['absent']}",
                     f"📊 Attendance rate: {att['percentage']}%",
                 ]
                 if att.get('recent_absences'):
                     lines.append(f"🗓 Recent absences: {', '.join(att['recent_absences'])}")
+                if att.get('recent_late'):
+                    lines.append(f"⏰ Recent late arrivals: {', '.join(att['recent_late'])}")
                 if att['percentage'] >= 90:
                     lines.append("\nGreat job maintaining excellent attendance! 🎉")
                 else:
@@ -990,22 +1006,36 @@ FACTS (use ONLY these, nothing else):
         # Step 10: Handle schedule
         if intent == "schedule" and function_result and "result" in function_result:
             result_data = function_result["result"]
-            if result_data.get("success"):
-                sched = result_data.get("schedule", {})
+            if result_data.get("success") and "schedule" in result_data:
+                sched = result_data["schedule"]
+                child_name = result_data.get("child_name", "")
                 facts_lines = [f"- {day}: {', '.join(subjects)}" for day, subjects in sched.items()]
                 facts_text = "\n".join(facts_lines)
-                friendly_text = self._llm_rephrase_facts(facts_text, intent)
+                header = f"{child_name}'s schedule:\n" if child_name else ""
+                friendly_text = self._llm_rephrase_facts(header + facts_text, intent)
                 return {"text": friendly_text, "intent": intent, "functionsCalled": functions_called}
+            else:
+                return {
+                    "text": f"Sorry, I couldn't retrieve the schedule right now. {result_data.get('message', '')}",
+                    "intent": intent,
+                    "functionsCalled": functions_called
+                }
 
         # Step 11: Handle materials
         if intent == "materials" and function_result and "result" in function_result:
             result_data = function_result["result"]
-            if result_data.get("success"):
-                mats = result_data.get("materials", [])
-                facts_lines = [f"- {m}" for m in mats]
-                facts_text = "\n".join(facts_lines)
-                friendly_text = self._llm_rephrase_facts(facts_text, intent)
-                return {"text": friendly_text, "intent": intent, "functionsCalled": functions_called}
+            if result_data.get("success") and "subjects" in result_data:
+                subjects = result_data["subjects"]
+                child_name = result_data.get("child_name", "")
+                header = f"Here are {child_name}'s subjects this year:\n" if child_name else "Here are your subjects this academic year:\n"
+                lines = [header] + [f"📖 {s}" for s in subjects]
+                return {"text": "\n".join(lines), "intent": intent, "functionsCalled": functions_called}
+            else:
+                return {
+                    "text": f"Sorry, I couldn't retrieve the subjects right now. {result_data.get('message', '')}",
+                    "intent": intent,
+                    "functionsCalled": functions_called
+                }
 
         # Step 12: LLM for everything else (policy questions, complaints, etc.)
         if self.llm_engine and self.llm_engine.model:
