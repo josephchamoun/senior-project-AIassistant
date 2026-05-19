@@ -123,38 +123,88 @@ response_template: |
 # ============================================================================
 
 POLICIES = [
+[
     {
         "id": "1.1",
         "question": "What is the attendance policy?",
-        "answer": "Students must maintain at least 90% attendance to be eligible for final examinations. Absences due to medical reasons require a doctor's note within 48 hours. More than 10 unexcused absences may result in academic probation.",
+        "answer": "Students are expected to attend all scheduled classes. Absences are monitored closely: students with more than 6 unexcused absences will receive a formal warning. Continued absences may result in academic probation or suspension from examinations. Medical absences require a doctor's note within 48 hours to be considered excused.",
         "category": "attendance",
         "lastUpdated": "2024-09-01"
     },
     {
         "id": "1.2",
         "question": "How is grading calculated?",
-        "answer": "Grading is based on: 40% midterm exams, 40% final exams, 10% assignments, and 10% class participation. The grading scale is: A (90-100), B (80-89), C (70-79), D (60-69), F (below 60).",
+        "answer": "Grading is distributed across 5 assessments: Test 1 (15%), Test 2 (15%), Exam 1 (30%), Test 3 (15%), and Exam 2 (25%). The grading scale is: A (90-100), B (80-89), C (70-79), D (60-69), F (below 60).",
         "category": "grading",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "1.3",
+        "question": "What is the homework and assignment policy?",
+        "answer": "Assignments must be submitted by the due date set by the teacher. Late submissions are accepted but will be flagged as late and may be subject to a grade penalty at the teacher's discretion. Students are encouraged to communicate with their teacher in advance if they anticipate difficulty meeting a deadline.",
+        "category": "assignments",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "1.4",
+        "question": "What happens if a student misses an exam?",
+        "answer": "Students who miss a scheduled exam must notify the school administration within 24 hours. A make-up exam may be granted only for documented medical emergencies or exceptional circumstances approved by the director. Unexcused absences during exams will result in a zero for that assessment.",
+        "category": "exams",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "1.5",
+        "question": "How are academic warnings issued?",
+        "answer": "Academic warnings are issued when a student's performance drops below acceptable levels. A student who fails two or more subjects mid-term will receive a written warning sent to both the student and their parent/guardian via the EduGate platform. Persistent poor performance may lead to a meeting with the academic advisor.",
+        "category": "academic_warnings",
         "lastUpdated": "2024-09-01"
     },
     {
         "id": "2.1",
         "question": "What is the privacy policy for student data?",
-        "answer": "Student academic records are confidential and protected under FERPA. Only students, their parents/guardians, and authorized school staff can access these records. Data is encrypted and stored securely.",
+        "answer": "Student academic records are confidential and protected under applicable privacy laws. Only students, their parents/guardians, and authorized school staff can access these records. All data is encrypted and stored securely within the EduGate platform.",
         "category": "privacy",
         "lastUpdated": "2024-09-01"
     },
     {
         "id": "3.1",
-        "question": "What are the tuition payment deadlines?",
-        "answer": "Tuition must be paid by the first day of each semester. Late payments incur a 5% penalty after 15 days. Payment plans are available for families facing financial hardship - contact the bursar's office.",
-        "category": "fees",
+        "question": "How can parents monitor their child's progress?",
+        "answer": "Parents and guardians can log into the EduGate platform at any time to view their child's grades, attendance records, homework submissions, and teacher feedback. Notifications are sent automatically for important events such as missed assignments, low grades, or attendance warnings.",
+        "category": "parents",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "3.2",
+        "question": "How can parents communicate with teachers?",
+        "answer": "Parents can send messages directly to teachers through the EduGate messaging system. Teachers are expected to respond within 2 business days. For urgent matters, parents may contact the school administration directly by phone or in person during office hours.",
+        "category": "parents",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "3.3",
+        "question": "What should parents do if their child is absent?",
+        "answer": "Parents must notify the school of any absence on the same day, either through the EduGate platform or by calling the school office. For medical absences, a doctor's note must be submitted within 48 hours. Failure to notify may result in the absence being recorded as unexcused.",
+        "category": "parents",
         "lastUpdated": "2024-09-01"
     },
     {
         "id": "4.1",
         "question": "What is the code of conduct for students?",
         "answer": "Students must respect all members of the school community, attend classes regularly, complete assignments on time, and follow dress code guidelines. Violations may result in warnings, detention, or suspension depending on severity.",
+        "category": "conduct",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "4.2",
+        "question": "What is the anti-bullying policy?",
+        "answer": "EduGate maintains a zero-tolerance policy for bullying, harassment, or discrimination of any kind — whether in person or online. Any student found to be engaging in bullying behavior will face disciplinary action ranging from a formal warning to suspension. Students are encouraged to report incidents to their teacher or school counselor.",
+        "category": "conduct",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "4.3",
+        "question": "What is the mobile phone policy?",
+        "answer": "Mobile phones must be kept on silent and stored away during class hours. Phone use is permitted during breaks and lunch. Repeated violations will result in the device being confiscated and returned only to a parent or guardian.",
         "category": "conduct",
         "lastUpdated": "2024-09-01"
     },
@@ -167,11 +217,61 @@ POLICIES = [
     },
     {
         "id": "6.1",
-        "question": "Who is the director of the school",
-        "answer": "Charbel Chamoun is the director of the school. He is 19 years old. He is born in 16 August 2007.",
+        "question": "Who is the director of the school?",
+        "answer": "Dr. Michel Khalil is the director of the school. He has over 20 years of experience in educational leadership and is committed to academic excellence and student wellbeing.",
         "category": "info",
         "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "6.2",
+        "question": "What are the school office hours?",
+        "answer": "The school administration office is open Monday through Friday from 7:30 AM to 4:00 PM. Parents and students can visit in person, call, or reach out through the EduGate platform during these hours for any administrative inquiries.",
+        "category": "info",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "6.3",
+        "question": "How does the EduGate platform work?",
+        "answer": "EduGate is the school's all-in-one management platform. Students can view their grades, submit homework, and track attendance. Parents can monitor their child's academic progress and communicate with teachers. Teachers can post assignments, record grades, manage attendance, and send announcements — all in one place.",
+        "category": "info",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "7.1",
+        "question": "What are the responsibilities of teachers?",
+        "answer": "Teachers are expected to arrive on time, prepare lessons in advance, record student attendance for every class, post assignments through EduGate with clear deadlines, and provide timely feedback on student work. Teachers must also maintain open and respectful communication with students and parents.",
+        "category": "teachers",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "7.2",
+        "question": "How should teachers handle grade disputes?",
+        "answer": "If a student or parent disputes a grade, they must submit a formal request through the EduGate platform within 7 days of the grade being published. The teacher will review the assessment and respond within 3 business days. If the dispute remains unresolved, it may be escalated to the academic coordinator.",
+        "category": "teachers",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "7.3",
+        "question": "What is the teacher punctuality and classroom management policy?",
+        "answer": "Teachers are expected to arrive on time for every class and ensure the classroom environment is conducive to learning. Class must begin and end at the scheduled time. Teachers are responsible for maintaining order, managing student behavior professionally, and ensuring all students are treated fairly and respectfully throughout the session.",
+        "category": "teachers",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "8.1",
+        "question": "What is the academic integrity policy?",
+        "answer": "Cheating, plagiarism, or any form of academic dishonesty is strictly prohibited. Students caught cheating during an exam or submitting plagiarized work will receive a zero for that assessment and may face further disciplinary action. All submitted work must be the student's own original effort.",
+        "category": "integrity",
+        "lastUpdated": "2024-09-01"
+    },
+    {
+        "id": "8.2",
+        "question": "What is the policy on exam conduct?",
+        "answer": "During exams, students must remain seated, silent, and work independently. No electronic devices, notes, or unauthorized materials are permitted unless explicitly stated. Students must hand in their exam paper before leaving the room. Any attempt to communicate with other students during an exam is considered cheating.",
+        "category": "exams",
+        "lastUpdated": "2024-09-01"
     }
+]
 ]
 
 # ============================================================================
