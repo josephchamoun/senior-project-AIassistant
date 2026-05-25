@@ -123,7 +123,7 @@ response_template: |
 # ============================================================================
 
 POLICIES = [
-[
+
     {
         "id": "1.1",
         "question": "What is the attendance policy?",
@@ -272,7 +272,7 @@ POLICIES = [
         "lastUpdated": "2024-09-01"
     }
 ]
-]
+
 
 # ============================================================================
 # SECTION 5: ROLE-BASED FUNCTION REGISTRY

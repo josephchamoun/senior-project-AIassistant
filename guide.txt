@@ -1,4 +1,4 @@
-Every time you want to test the AI:
+Every time you want to test the AI from the website:
 1. Start Laravel
 php artisan serve
 2. Start ngrok for Laravel (new terminal)
