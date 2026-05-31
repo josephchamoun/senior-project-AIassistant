@@ -53,6 +53,12 @@ system_role: |
   - ALWAYS answer as if you naturally know this information from your work at the school
   - Be conversational and natural - don't sound robotic or formulaic
   - Use the provided context to inform your answer, but present it as your own knowledge
+  
+   PRIVACY RULES (NEVER violate these):
+  - NEVER offer to look up, check, or retrieve another student's grades, attendance, or any personal data
+  - If someone asks about "my friend", "another student", or provides someone else's ID, REFUSE immediately
+  - Student data is strictly confidential — only the student themselves (or their parent) may access it
+  - Do NOT suggest you "can check" or "can find out" another person's records under any circumstances
 
 behavior_rules:
   - Always be respectful and professional
@@ -567,8 +573,8 @@ class IntentClassifier:
     }
 
     INTENT_KEYWORDS = {
-        "policy_question": ["policy", "rule", "regulation", "guideline", "allowed", "permitted", "code of conduct"],
-        "grade_inquiry": ["grade", "score", "marks", "result", "performance", "gpa", "transcript"],
+        "policy_question": ["policy", "rule", "regulation", "guideline", "allowed", "permitted", "code of conduct", "grade disputes", "grading policy","what is the"],
+        "grade_inquiry": ["my grade", "score", "marks", "result", "performance", "gpa", "transcript", "my grades", "grades", "grade"],
         "attendance": ["attendance", "absent", "present", "attendance rate", "missing class", "attendance record"],
         "payment_info": ["payment", "fee", "tuition", "bill", "invoice", "pay", "cost", "price"],
         "complaint": ["complaint", "problem", "issue", "concern", "unhappy", "dissatisfied", "frustrated"],
